@@ -1,0 +1,202 @@
+datasource db {
+  provider = "mysql"
+  
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.VarChar(50)
+  email        String    @unique @db.VarChar(191)
+  name         String
+  passwordHash String
+  role         Role      @default(STUDENT)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  teacher      Teacher?
+  student      Student?
+  auditLogs    AuditLog[]
+}
+
+model Session {
+  id        String    @id @default(uuid()) @db.VarChar(50)
+  name      String    @unique @db.VarChar(100)
+  isCurrent Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  
+  results     Result[]
+  attendance  Attendance[]
+  comments    TermComment[]
+}
+
+model Term {
+  id        String    @id @default(uuid()) @db.VarChar(50)
+  name      String    @db.VarChar(100)
+  isCurrent Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  
+  results     Result[]
+  attendance  Attendance[]
+  comments    TermComment[]
+  
+  @@unique([name, isCurrent])
+}
+
+model Class {
+  id        String    @id @default(uuid()) @db.VarChar(50)
+  name      String    @unique @db.VarChar(100)
+  createdAt DateTime  @default(now())
+  
+  students           Student[]
+  teacherAssignments TeacherAssignment[]
+  results            Result[]
+}
+
+model Subject {
+  id        String    @id @default(uuid()) @db.VarChar(50)
+  name      String    @unique @db.VarChar(100)
+  code      String    @unique @db.VarChar(20)
+  createdAt DateTime  @default(now())
+  
+  teacherAssignments TeacherAssignment[]
+  results            Result[]
+}
+
+model Teacher {
+  id            String    @id @default(uuid()) @db.VarChar(50)
+  userId        String    @unique @db.VarChar(50)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone         String?
+  qualification String?
+  createdAt     DateTime  @default(now())
+  
+  assignments   TeacherAssignment[]
+}
+
+model TeacherAssignment {
+  id        String   @id @default(uuid()) @db.VarChar(50)
+  teacherId String   @db.VarChar(50)
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classId   String   @db.VarChar(50)
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId String   @db.VarChar(50)
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([teacherId, classId, subjectId])
+}
+
+model Student {
+  id          String   @id @default(uuid()) @db.VarChar(50)
+  userId      String   @unique @db.VarChar(50)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admissionNo String   @unique @db.VarChar(50)
+  gender      Gender
+  dob         DateTime
+  address     String?
+  parentName  String
+  parentPhone String
+  parentEmail String?
+  photoUrl    String?  @db.LongText
+  classId     String   @db.VarChar(50)
+  class       Class    @relation(fields: [classId], references: [id])
+  createdAt   DateTime @default(now())
+
+  results     Result[]
+  attendance  Attendance[]
+  comments    TermComment[]
+}
+
+model Result {
+  id         String   @id @default(uuid()) @db.VarChar(50)
+  studentId  String   @db.VarChar(50)
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId    String   @db.VarChar(50)
+  class      Class    @relation(fields: [classId], references: [id])
+  subjectId  String   @db.VarChar(50)
+  subject    Subject  @relation(fields: [subjectId], references: [id])
+  sessionId  String   @db.VarChar(50)
+  session    Session  @relation(fields: [sessionId], references: [id])
+  termId     String   @db.VarChar(50)
+  term       Term     @relation(fields: [termId], references: [id])
+  caScore    Float    @default(0.0)
+  examScore  Float    @default(0.0)
+  totalScore Float    @default(0.0)
+  grade      String   @db.VarChar(10)
+  remark     String?  @db.VarChar(191)
+  submitted  Boolean  @default(false)
+  approved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([studentId, classId, subjectId, sessionId, termId])
+}
+
+model Attendance {
+  id          String   @id @default(uuid()) @db.VarChar(50)
+  studentId   String   @db.VarChar(50)
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sessionId   String   @db.VarChar(50)
+  session     Session  @relation(fields: [sessionId], references: [id])
+  termId      String   @db.VarChar(50)
+  term        Term     @relation(fields: [termId], references: [id])
+  totalDays   Int      @default(60)
+  daysPresent Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@unique([studentId, sessionId, termId])
+}
+
+model TermComment {
+  id             String   @id @default(uuid()) @db.VarChar(50)
+  studentId      String   @db.VarChar(50)
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sessionId      String   @db.VarChar(50)
+  session        Session  @relation(fields: [sessionId], references: [id])
+  termId         String   @db.VarChar(50)
+  term           Term     @relation(fields: [termId], references: [id])
+  teacherComment String?  @db.Text
+  principalComment String? @db.Text
+  createdAt      DateTime @default(now())
+
+  @@unique([studentId, sessionId, termId])
+}
+
+model SchoolSettings {
+  id                    Int      @id @default(1)
+  schoolName            String   @default("Apex International Academy")
+  address               String   @db.Text
+  phone                 String
+  email                 String
+  website               String?
+  logoUrl               String?  @db.LongText
+  principalName         String
+  principalSignatureUrl String?  @db.LongText
+  nextTermResumptionDate String?
+  caMaxScore            Float    @default(30.0)
+  examMaxScore          Float    @default(70.0)
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.VarChar(50)
+  action    String
+  details   String   @db.Text
+  userId    String?  @db.VarChar(50)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  role      String
+  timestamp DateTime @default(now())
+}
